@@ -39,7 +39,7 @@ Github repo method
     
         response = await dl.status(uuid)
         
-        
+
         
         returns a dict
 
@@ -116,7 +116,7 @@ ___
 # TODO
 
 - Multipart Download
-- Queue Download / Pararrel Download Limit
+- Queue Download / Parallel Downloads Limit
 - Better Error Handling
 
 
