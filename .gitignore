@@ -1,0 +1,12 @@
+__pycache__/
+venv
+.idea
+
+#repl stuffs
+poetry.lock
+pyproject.toml
+
+#builds
+build/
+dist/
+pyaiodl.egg-info/
