@@ -15,7 +15,7 @@ ___
 
 
 ## installation
-pypi Method (recommanded)
+pypi Method (recommended)
 
     pip3 install pyaiodl
 
@@ -24,7 +24,7 @@ Github repo method
     pip3 install git+https://github.com/aryanvikash/pyaiodl.git
 
 
-# Avalible Methods
+# Available Methods
 - Downloader class Instance
    `Non-blocking , params = [fake_useragent:bool,chunk_size:int ,download_path:str] optinals`
    
