@@ -2,7 +2,7 @@
 
 ### Don't Use it in Production or Live Projects Currently Its Unstable
 ___
- [![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-360/)
+ [![Python 3.6](https://img.shields.io/badge/python-3-blue.svg)](https://www.python.org/downloads/release/python-360/)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/aryanvikash/pyaiodl)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/aryanvikash/pyaiodl)
 [![Open Source Love png3](https://badges.frapsoft.com/os/v3/open-source.png?v=103)](https://github.com/aryanvikash/pyaiodl)
@@ -11,11 +11,11 @@ ___
 ## Version
 [![Beta badge](https://img.shields.io/badge/STATUS-BETA-red.svg)](https://github.com/aryanvikash/pyaiodl)
 
-[![PyPI version](https://badge.fury.io/py/pyaiodl.svg)](https://badge.fury.io/py/pyaiodl)
+[![PyPI version](https://badge.fury.io/py/pyaiodl.svg)](https://pypi.org/project/pyaiodl/)
 
 
 ## installation
-pypi Method (recommanded)
+pypi Method (Recommended)
 
     pip3 install pyaiodl
 
@@ -24,23 +24,32 @@ Github repo method
     pip3 install git+https://github.com/aryanvikash/pyaiodl.git
 
 
-# Avalible Methods
+# Available Methods
 - Downloader class Instance
    `Non-blocking , params = [fake_useragent:bool,chunk_size:int ,download_path:str] optinals`
    
         dl = Downloader()
--   Download [ `download(self.url)` ]  
+-   Download [ `download(self,url)` ]  
 
         uuid = await dl.download(url)
+- Errors [` iserror(self, uuid) `]
+    ` : Returns -  Error Or None
+    , Even On cancel It returns an error "{uuid} Cancelled"`
+
+    ```
+    await dl.iserror(uuid)
+    ```
+
+
 - cancel [ `cancel(self, uuid)` ]
-       
+
        await dl.cancel(uuid)
 - Get Status [ `status(self, uuid)` ]  
     
         response = await dl.status(uuid)
         
 
-        
+
         returns a dict
 
         """
@@ -52,12 +61,12 @@ Github repo method
         downloaded_str :str
         progress:int
         download_speed:str
-        active: bool
         complete :bool
         download_path:str
+
         """
 
-- is_active returns : bool [ `is_active( self,uuid )` ]` on cancel and download complete it will return False` 
+- is_active returns : bool [ `is_active( self,uuid )` ]` - on cancel ,error , download complete  return False`
     
         result = await dl.is_active(uuid)
 
@@ -68,56 +77,71 @@ ___
 
 ```py
 
+from pyaiodl import Downloader, errors
 import asyncio
-from pyaiodl import Downloader
-
 url = "https://speed.hetzner.de/100MB.bin"
 
-async def main(url):
+
+async def main():
     dl = Downloader()
-
+    # you can pass your
+    # custom chunk size and Download Path
+    # dl = Downloader(download_path="/your_dir/", chunk_size=10000)
+    uuid = await dl.download(url)
     try:
-            #Non-blocking
-        uuid = await dl.download(url)
-
-
-        
-        #progress
         while await dl.is_active(uuid):
-        
+
             r = await dl.status(uuid)
-            #cancel
-            # await dl.cancel(uuid)
+
+               #cancel
+            if r['progress'] > 0:
+                try:
+                    await dl.cancel("your_uuid")
+                except errors.DownloadNotActive as na:
+                    print(na)
+
+
             print(f"""
-        Filename: {r['filename']}
-        Total : {r['total_size_str']}
-        Downloaded : {r['downloaded_str']}
-        Download Speed : {r['download_speed']}
-        progress: {r['progress']}
-         """)
+            Filename: {r['filename']}
+            Total : {r['total_size_str']}
+            Downloaded : {r['downloaded_str']}
+            Download Speed : {r['download_speed']}
+            progress: {r['progress']}
+             """)
 
+            # let him breath  for a second:P
             await asyncio.sleep(1)
-        
+
+    # If You are putting uuid  manually Than its better handle This Exception
+    except errors.InvalidId:
+        print("not valid uuid")
+        return
+
+    # when loop Breaks There are 2 Possibility
+    # either Its An error Or Download Complete
+    # Cancelled Is also count as error
+    if await dl.iserror(uuid):
+        print(await dl.iserror(uuid))
+
+    else:
         # Final filename / path
-        print( "download completed : ",r['download_path'])
+       print("Download completed : ", r['download_path'])
 
 
-    except Exception as e:
-        print(e)
+asyncio.get_event_loop().run_until_complete(main())
 
-asyncio.get_event_loop().run_until_complete(main(url))
 ```
 
 ___
 ### known Bugs -
- - Error is Not Handled Correctly
+ - None Please Report :)
 
 ___
 # TODO
 
 - Multipart Download
 - Queue Download / Parallel Downloads Limit
-- Better Error Handling
+- [x] Better Error Handling
 
 
 

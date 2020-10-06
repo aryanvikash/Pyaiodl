@@ -4,9 +4,11 @@ import cgi
 import os
 import aiohttp
 from .utils import human_size, gen_uuid, getspeed
-from .errors import download_not_active
+
 import aiofiles
 from time import time
+import socket
+from contextlib import suppress
 
 
 class PrivateDl:
@@ -19,7 +21,7 @@ class PrivateDl:
                 or dl.cancel()
     """
 
-    def __init__(self, fake_useragent: bool = False, chunk_size: int = 10000, download_path=None):
+    def __init__(self, fake_useragent: bool = False, chunk_size = None, download_path=None):
         self.chunk_size = chunk_size
         self.total_size = 0
         self.downloaded = 0
@@ -32,7 +34,6 @@ class PrivateDl:
         self.file_type = None
         self.session = None
         # incase if download is cancelled  we can check it here
-        self.isActive = True
 
         # both are protected bcz we don't need mutiple value to check status
         self._cancelled = False
@@ -41,13 +42,18 @@ class PrivateDl:
         self.task = None
         self.fake_useragent = fake_useragent
 
+        self.conn = aiohttp.TCPConnector(
+            family=socket.AF_INET,
+            verify_ssl=False)
+
         # TODO add retry
         self.max_tries = 3
         self.start_time = 0
         # basically i will hold only one uuid ;)
         self.__toatal_downloads = {}
         self.real_url = None
-
+        # error goes here
+        self.iserror = None
         self.downloadedstr = 0  # 10MiB
         if fake_useragent:
             from fake_useragent import UserAgent
@@ -63,7 +69,7 @@ class PrivateDl:
             __uuid = gen_uuid()
             self.uuid = __uuid
             self.url = url
-            __task = asyncio.create_task(self.__down())
+            __task = asyncio.ensure_future(self.__down())
 
             self.__toatal_downloads[__uuid] = {}
             self.__toatal_downloads[__uuid]["obj"] = download_obj
@@ -72,7 +78,8 @@ class PrivateDl:
 
             return self.uuid
         except Exception as e:
-            raise Exception(e)
+            await self.mark_done(e)
+            return
 
     async def __down(self) -> None:
 
@@ -84,15 +91,15 @@ class PrivateDl:
                 "User-Agent": self.userAgent
             }
             self.session = aiohttp.ClientSession(
-                headers=headers, raise_for_status=True)
+                headers=headers, raise_for_status=True, connector=self.conn)
         else:
-            self.session = aiohttp.ClientSession(raise_for_status=True)
+            self.session = aiohttp.ClientSession(
+                raise_for_status=True, connector=self.conn)
         try:
             self.filename, self.total_size, self.content_type, self.real_url = await self.__getinfo()
         except Exception as e:
-            self.isActive = False
-            await self.session.close()
-            raise Exception(e)
+            await self.mark_done(e)
+            return
 
         try:
             async with self.session.get(self.url) as r:
@@ -102,7 +109,8 @@ class PrivateDl:
                         try:
                             os.makedirs(self.download_path)
                         except Exception as e:
-                            raise Exception(e)
+                            await self.mark_done(e)
+                            return
 
                     self.download_path = os.path.join(
                         self.download_path, self.filename)
@@ -110,17 +118,25 @@ class PrivateDl:
                     self.download_path = self.filename
 
                 async with aiofiles.open(self.download_path, mode="wb") as f:
-                    # removed iter_chunked(bytes) for max performance
-                    async for chunk in r.content.iter_chunked(self.chunk_size):
-                        await f.write(chunk)
-                        downloaded_chunk += len(chunk)
-                        await self.__updateStatus(downloaded_chunk)
+                    
+                    if self.chunk_size:
+                        async for chunk in r.content.iter_chunked(self.chunk_size):
+                            await f.write(chunk)
+                            downloaded_chunk += len(chunk)
+                            await self.__updateStatus(downloaded_chunk)
+                    else:
+                        async for chunk in r.content.iter_any():
+                            await f.write(chunk)
+                            downloaded_chunk += len(chunk)
+                            await self.__updateStatus(downloaded_chunk)
+                            
         except Exception as e:
-            raise Exception(e)
+            await self.mark_done(e)
+            return
 
         # session close
         self._complete = True
-        self.isActive = False
+
         await self.session.close()
 
     async def __updateStatus(self, downloaded_chunks):
@@ -140,7 +156,9 @@ class PrivateDl:
         """ get Url Info like filename ,size and filetype """
 
         async with self.session.get(
-                self.url, allow_redirects=True
+                self.url,
+                allow_redirects=True
+
         ) as response:
 
             # Use redirected URL
@@ -174,9 +192,9 @@ class PrivateDl:
         downloaded_str :str
         progress:int
         download_speed:str
-        active: bool
         complete :bool
         download_path:str
+
         """
 
         return {
@@ -188,11 +206,23 @@ class PrivateDl:
             "downloaded_str": human_size(self.downloaded),
             "progress": self.progress,
             "download_speed": self.download_speed,
-            "active": self.isActive,
             "complete": self._complete,
-            "download_path": self.download_path
+            "download_path": self.download_path,
+
 
         }
+
+    async def mark_done(self, error):
+
+        self.iserror = error
+        await self.session.close()
+
+        self.task.cancel()
+
+        # supress CanceledError raised by asyncio cancel task
+        with suppress(asyncio.CancelledError):
+            await self.task
+
 
     async def cancel(self, uuid) -> bool:
         """ provide uuid returned by download method to cancel it
@@ -200,13 +230,12 @@ class PrivateDl:
         """
         await self.session.close()
         # check task is active or cancelled
+
         if not self.task.done():
-            # return True or False
+            
             __task = self.__toatal_downloads[uuid]["task"]
             __iscancel: bool = __task.cancel()
-            if __iscancel:
-                self.isActive = False
+
             return __iscancel
         else:
-
-            raise download_not_active(f"{uuid} : Download not active")
+            return True

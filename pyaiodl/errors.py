@@ -1,7 +1,9 @@
-__all_ = ['download_not_active']
+__all_ = ['DownloadNotActive', 'InvalidId']
 
 
-
-
-class download_not_active(Exception):
+class DownloadNotActive(Exception):
     """ Download Not active """
+
+
+class InvalidId(Exception):
+    """ on Invalid uuid """
