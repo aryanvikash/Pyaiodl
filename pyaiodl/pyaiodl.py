@@ -1,6 +1,8 @@
 import asyncio
 import urllib.parse
 import cgi
+import secrets
+import mimetypes
 import os
 import aiohttp
 from .utils import human_size, gen_uuid, getspeed
@@ -131,11 +133,16 @@ class PrivateDl:
                             await self.__updateStatus(downloaded_chunk)
                             
         except Exception as e:
+
             await self.mark_done(e)
             return
 
         # session close
         self._complete = True
+
+        # incase aiohtttp can't grab file size :P
+        if self.total_size == 0:
+            self.total_size = self.downloaded
 
         await self.session.close()
 
@@ -160,6 +167,7 @@ class PrivateDl:
                 allow_redirects=True
 
         ) as response:
+            # print(response)
 
             # Use redirected URL
             self.url = str(response.url)
@@ -169,12 +177,17 @@ class PrivateDl:
                 filename = content_disposition[1]['filename']
                 filename = urllib.parse.unquote_plus(filename)
             except KeyError:
-                filename = response._real_url.name
+                    filename = response._real_url.name
+
+                    if not filename:
+                        guessed_extension = mimetypes.guess_extension(
+                            response.headers["Content-Type"].split(";")[0])
+                        filename = f"{gen_uuid(size=5)}{guessed_extension}"
+
             try:
                 size = int(response.headers['Content-Length'])
             except KeyError:
                 size = 0
-
             return (
                 filename,
                 size,

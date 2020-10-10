@@ -1,13 +1,13 @@
 import setuptools
 
-from version import version__
+
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="pyaiodl",
-    version=version__,
+    version="0.0.5",
     author="Aryan Vikash",
     author_email="followvikash8@gmail.com",
     description="A Python Asynchronous Downloader - pyaiodl",

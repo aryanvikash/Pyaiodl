@@ -31,6 +31,9 @@ class Downloader:
             self._alldownloads[_uuid] = {}
             self._alldownloads[_uuid] = {"obj": _down}
 
+            # just init things otherwise it will throw keyerror :
+            self._alldownloads[_uuid]["iscancel"] = False
+
         except Exception as e:
             raise Exception(e)
         return _uuid
